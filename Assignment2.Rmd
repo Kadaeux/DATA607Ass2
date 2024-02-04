@@ -1,0 +1,34 @@
+---
+title: "Assignment2"
+author: "Nicholas Kunze"
+date: "2024-02-03"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+if("tidyverse" %in% rownames(installed.packages()) == FALSE) {install.packages("tidyverse")}
+if("RMySQL" %in% rownames(installed.packages()) == FALSE) {install.packages("RMySQL")}
+library(RMySQL)
+library(tidyverse)
+```
+
+# DATA607 Assignment 2
+
+## Overview
+<DESCRIPTION, OVERVIEW>
+
+```{r cars}
+azuredb = dbConnect(MySQL(), user='nicholas.kunze77', password='nicholas.kunze77', dbname='nicholas.kunze77', host='cunydata607sql.mysql.database.azure.com')
+
+raw_df <- dbGetQuery(azuredb, "select * from movie_survey_raw;")
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure}
+plot(pressure)
+```
+
