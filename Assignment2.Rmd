@@ -2,33 +2,102 @@
 title: "Assignment2"
 author: "Nicholas Kunze"
 date: "2024-02-03"
-output: html_document
+output:
+  html_document:
+    highlight: pygments
+    theme: cerulean
+    toc: true
+    toc_float: true
+  pdf_document: default
+editor_options: 
+  chunk_output_type: console
+params:
+  dbuser: 
+    label: "Username"
+    value: "nicholas.kunze77"
+    input: text
+  dbpass: 
+    label: "Password"
+    value: "nicholas.kunze77"
+    input: password
+  dbname: 
+    label: "Database"
+    value: "nicholas.kunze77"
+    input: password
+  dbhost: 
+    label: "Host"
+    value: "cunydata607sql.mysql.database.azure.com"
+    input: password
+---
 ---
 
-```{r setup, include=FALSE}
+```{r global_options, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 if("tidyverse" %in% rownames(installed.packages()) == FALSE) {install.packages("tidyverse")}
 if("RMySQL" %in% rownames(installed.packages()) == FALSE) {install.packages("RMySQL")}
+if("keyring" %in% rownames(installed.packages()) == FALSE) {install.packages("keyring")}
 library(RMySQL)
 library(tidyverse)
+library(keyring)
 ```
 
 # DATA607 Assignment 2
 
 ## Overview
-<DESCRIPTION, OVERVIEW>
 
-```{r cars}
-azuredb = dbConnect(MySQL(), user='nicholas.kunze77', password='nicholas.kunze77', dbname='nicholas.kunze77', host='cunydata607sql.mysql.database.azure.com')
+In this assignment, I used Google Forms (https://forms.gle/y6mbTf7X4EEW2nu7A) to collect ratings for six movies. I then used MySQL Workbench's Table Import function to import the csv of the survey results as a table. The raw data included the email addresses provided by those who did the survey, the timestamp it was received, and the 'ratings' for each of the six movies, if they had seen them. Once I had the data imported into MySql, I normalized the data by splitting it into three tables: person, survey, and survey_response with the proper primary and foreign keys. This will allow my database to handle any future surveys of most formats.
 
-raw_df <- dbGetQuery(azuredb, "select * from movie_survey_raw;")
+Also, I used a keyring to store db password. There is likely a way to do this more efficiently, such as a way to hide the host, user, etc, possibly with a DSN file, but I have not explored this.
+
+I could not, however, figure out in time how to knit with prompts for the keyring... I instead knitted/published using parameters in the Rmd.
+
+## Extracting Data from MySQL
+
+```{r mysql-data-extract}
+kb <- keyring::backend_file$new()
+
+azuredb = dbConnect(MySQL(), user=params$dbuser, password=params$dbpass, dbname=params$dbname, host=params$dbhost)
+
+movieSurvey <- dbGetQuery(azuredb, "select pid as voter, question as movie, response as rating from survey_response where sid=1 and pid<6;")
+
+dbDisconnect(azuredb)
+head(movieSurvey)
 ```
 
-## Including Plots
+Let's add some arbitrary names to our survey participants to make it more readable. 
 
-You can also embed plots, for example:
+```{r data-mutate}
+movieSurvey$voter[movieSurvey$voter == 1] <- 'Jeff'
+movieSurvey$voter[movieSurvey$voter == 2] <- 'Mira'
+movieSurvey$voter[movieSurvey$voter == 3] <- 'Fred'
+movieSurvey$voter[movieSurvey$voter == 4] <- 'Olive'
+movieSurvey$voter[movieSurvey$voter == 5] <- 'Muhammad'
+movieSurvey$rating<-as.integer(movieSurvey$rating)
+```
 
-```{r pressure}
-plot(pressure)
+## Data Exploration
+
+
+```{r initial-plot}
+ggplot(data = movieSurvey, aes(x = movie, y = rating, fill = voter)) + 
+  geom_bar(position="dodge", stat="identity") + 
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+From first glance, it is obvious from this limited data that some movies are missing ratings from those surveyed. The most obvious is The Last Airbender. Olive is missing votes for Sahara and The Last Airbender. Mira is just missing The Last Airbender. 
+
+To make sure our data is 'clean', let's see whether the data is actually missing or has a value that may cause issues with anything we try to do with this data.
+
+```{r explore-data}
+subset(movieSurvey, voter=='Mira' | voter=='Olive')
+```
+
+It looks like our data for movies not seen results in a default value of 0. We should definitely remove these values, at least until we can think of a better way to handle this. Otherwise, 0 will cause issues when doing any kind of analysis against the ratings values, as 0 will alter the mean, median, etc.
+
+```{r remove-dirty-data}
+movieSurvey <- subset(movieSurvey, rating!=0)
+ggplot(data = movieSurvey, aes(x = movie, y = rating, fill = voter)) + 
+  geom_bar(position="dodge", stat="identity") + 
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
 ```
 
